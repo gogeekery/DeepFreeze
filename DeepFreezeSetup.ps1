@@ -5,6 +5,8 @@
 # If you include the removal script this will attempt to remove any existing Deep Freeze installation first
 # If you do not include that script, please make sure Deep Freeze is fully removed from the computer first
 # You can contact Faronics for an official Deep Freeze removal tool
+# My included removal script may have issues and is not maintained so it may break
+
 
 # >> Do not run this on a frozen computer!
 # >> Use at your own risk.
