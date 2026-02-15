@@ -12,16 +12,16 @@ Designed for library or public lab environments to automate machine provisioning
 Will reboot the system and uses task scheduler for Deep Freeze after booting fresh user profile.
 
 #### **Core Features**
+- [ ] Optionally runs removal script (if included and thawed install is detected)
 - [x] Creates a new local user account
 - [x] Configures Windows system settings
 - [x] Installs Deep Freeze
-- [ ] Optionally runs removal script (if included)
 
 > [!IMPORTANT]
 > Review configuration, read through the script and test in a **non-production environment** before mass deployment.
 
 ### 2. `DeepFreezeRemoval.ps1`
-A standalone utility to uninstall Deep Freeze from the machine.
+A standalone utility to uninstall Deep Freeze from the machine. Deep Freeze must be thawed. May be invoked from DeepFreezeSetup if included side-by-side.
 
 <details>
 <summary>⚠️ <b>Maintenance & Support (Click to expand)</b></summary>
