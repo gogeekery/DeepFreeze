@@ -332,11 +332,15 @@ if (Get-LocalUser -Name $UserName -ErrorAction SilentlyContinue) {
     $UserSID = (Get-LocalUser -Name $UserName).SID.Value
 
     # Force logoff if needed
-    quser | ForEach-Object {
-        if ($_ -match $UserName) {
-            $Parts = $_.Trim() -split ' +'
-            $SessionId = $Parts | Where-Object { $_ -match '^\d+$' } | Select-Object -First 1
-            if ($SessionId) { logoff $SessionId }
+    quser | Select-Object -Skip 1 | ForEach-Object {
+        $line = $_ -replace '^\>', ''  # remove leading >
+        $columns = $line -split '\s+'
+
+        $user = $columns[0]
+        $sessionId = $columns[2]
+
+        if ($user -eq $UserName) {
+            logoff $sessionId
         }
     }
 
