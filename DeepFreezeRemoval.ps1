@@ -5,6 +5,8 @@
 # Use at your own risk. I am not liable for any damages or losses
 # This will remove Deep Freeze components but system must not be frozen
 
+
+
 # --- Helper Functions ---
 
 function Write-Log {
@@ -54,51 +56,27 @@ function Remove-RegistryKeySafe {
 }
 
 
-# Add-Type @"
-# using System;
-# using System.Runtime.InteropServices;
 
-# public class NativeMethods {
-#     [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)]
-#     public static extern bool MoveFileEx(string lpExistingFileName, string lpNewFileName, int dwFlags);
-# }
-# "@
+if (-not ([System.Management.Automation.PSTypeName]'Win32.NativeMethods').Type) {
 
-# function Remove-FileSafe {
-#     param([string]$Path)
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
 
-#     if (!(Test-Path $Path)) { return -1 }
-
-#     try {
-#         Remove-Item -Path $Path -Force -ErrorAction Stop
-#         Write-Log "$Path deleted." Cyan
-#         return 0
-#     }
-#     catch {
-#         # MOVEFILE_DELAY_UNTIL_REBOOT = 4
-#         $result = [NativeMethods]::MoveFileEx($Path, $null, 4)
-#         if ($result) {
-#             Write-Log "$Path locked, scheduled for deletion after reboot." Yellow
-#             return 0
-#         }
-#         else {
-#             Write-Log "$Path could not be deleted or scheduled." Red
-#             return 1
-#         }
-#     }
-# }
-
-# Load native method
-if (-not ([System.Management.Automation.PSTypeName]'NativeMethods').Type) {
-    Add-Type -Namespace Win32 -Name NativeMethods -MemberDefinition @"
-    using System;
-    using System.Runtime.InteropServices;
+namespace Win32 {
     public static class NativeMethods {
-        [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)]
-        public static extern bool MoveFileEx(string lpExistingFileName, string lpNewFileName, int dwFlags);
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern bool MoveFileEx(
+            string lpExistingFileName,
+            string lpNewFileName,
+            int dwFlags
+        );
     }
+}
 "@
 }
+
 
 function Remove-FileSafe {
     [CmdletBinding()]
@@ -175,16 +153,23 @@ function Remove-DFDriver {
 
     # Remove from Services registry
     $serviceKey = "HKLM:\SYSTEM\CurrentControlSet\Services\$DriverName"
-    if ((Remove-RegistryKeySafe $serviceKey) -ne 0) {
+    if ((Remove-RegistryKeySafe $serviceKey) -eq 1) {
         Write-Log "Failed to remove service registry for $DriverName" Red
         return 1
     }
 
     # Delete driver file
     $driverFile = "$env:windir\System32\drivers\$DriverName.sys"
-    if ((Remove-FileSafe $driverFile) -ne 0) {
-        Write-Log "Failed to delete $DriverName.sys" Red
-        return 2
+    $result = Remove-FileSafe $driverFile
+
+    switch ($result) {
+        0 { } # deleted
+        1 { Write-Log "$DriverName.sys scheduled for deletion on reboot." Yellow }
+        2 { Write-Log "$DriverName.sys not found (already removed)." Gray }
+        3 {
+            Write-Log "Failed to delete $DriverName.sys" Red
+            return 2
+        }
     }
 
     Write-Log "Driver $DriverName removed." Cyan
@@ -267,51 +252,39 @@ function Remove-DFRegistry {
 
 function Remove-DFWMI {
 
-    Write-Log "Removing WMI class..." Cyan
+    Write-Log "Checking for DeepFreeze WMI class..." Cyan
 
     try {
-        Get-WmiObject -Namespace "root\faronics" -Class "DeepFreeze" -ErrorAction Stop | 
-            ForEach-Object { $_.Delete() }
+        # Check if class exists
+        $class = Get-WmiObject -Namespace "root\faronics" -List -ErrorAction Stop |
+                 Where-Object { $_.Name -eq "DeepFreeze" }
 
-        Remove-WmiObject -Namespace "root\faronics" -Class "__Class" `
-            -Filter "Name='DeepFreeze'" -ErrorAction SilentlyContinue
+        if (-not $class) {
+            Write-Log "DeepFreeze WMI class not found. Nothing to remove." Yellow
+            return 0
+        }
 
-        Write-Log "WMI class removed." Cyan
+        Write-Log "Removing DeepFreeze WMI instances..." Cyan
+
+        # Remove all instances
+        Get-WmiObject -Namespace "root\faronics" -Class "DeepFreeze" -ErrorAction Stop |
+            ForEach-Object {
+                $_.Delete()
+            }
+
+        Write-Log "Removing DeepFreeze WMI class definition..." Cyan
+
+        # Remove the class definition
+        $class.Delete()
+
+        Write-Log "WMI class removed successfully." Green
         return 0
     }
     catch {
-        Write-Log "Failed to remove WMI class." Yellow
+        Write-Log ("Failed to remove WMI class. Error: {0}" -f $_.Exception.Message) Red
         return 1
     }
 }
-
-# CimInstance implementation:
-
-# function Remove-DFWMI {
-#     Write-Log "Removing WMI class..." Cyan
-
-#     try {
-#         # Remove any DeepFreeze instances in the faronics namespace
-#         $instances = Get-CimInstance -Namespace 'root\faronics' -ClassName 'DeepFreeze' -ErrorAction Stop
-#         foreach ($inst in $instances) {
-#             Remove-CimInstance -InputObject $inst -ErrorAction Stop
-#         }
-
-#         # Remove the class definition itself (the __Class instance named DeepFreeze)
-#         $classDef = Get-CimInstance -Namespace 'root\faronics' -ClassName '__Class' -Filter "Name='DeepFreeze'" -ErrorAction SilentlyContinue
-#         if ($classDef) {
-#             Remove-CimInstance -InputObject $classDef -ErrorAction Stop
-#         }
-
-#         Write-Log "WMI class removed." Cyan
-#         return 0
-#     }
-#     catch {
-#         Write-Log "Failed to remove WMI class: $($_.Exception.Message)" Yellow
-#         return 1
-#     }
-# }
-
 
 
 
