@@ -92,7 +92,7 @@ function Log {
     $TimeStamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
     $FormattedMessage = "$TimeStamp - $Message"
     
-    Log $FormattedMessage -ForegroundColor $ForegroundColor
+    Write-Host $FormattedMessage -ForegroundColor $ForegroundColor
     $FormattedMessage | Out-File -FilePath $LogFile -Append -Encoding UTF8
 }
 
