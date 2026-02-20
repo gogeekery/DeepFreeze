@@ -11,76 +11,11 @@
 # >> Do not run this on a frozen computer!
 # >> Use at your own risk.
 
+
 if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     Write-Host "Script must be run as Administrator." Red
     exit 1
 }
-
-
-
-# Log file for silent/remote installs
-$LogFile = Join-Path $env:windir "Temp\LabDFSetupScript.log"
-
-# Account details for the public user (can be blank password but GPO would need configured)
-$UserName = "Student"
-$Password = "pw"
-
-$ProfileRoot = Join-Path $env:SystemDrive "Users"
-$ProfilePath = Join-Path $ProfileRoot $UserName
-
-$ShortcutDesktop = "$env:PUBLIC\Desktop"        # Path to put desktop shortcuts
-
-# ----------
-$WallpaperUrl  = "https://goodwillbigbend.org/LabConfig/Career Campus Desktop Wallpaper.png"    # TODO: Replace with a link to your lab/library wallpaper
-$WallpaperDir  = "$env:PUBLIC\Documents"
-$WallpaperPath = Join-Path $WallpaperDir "Wallpaper.png"
-
-
-$DeepFreezeURL = "https://www8.deepfreeze.com/api/GetProductInstaller"  # TODO: Replace this with the URL for your Deep Freeze installer (eg: cloud web installer)
-$DeepFreezePath = "$env:PUBLIC\Documents\DeepFreezeInstaller.exe"
-
-
-# Desktop shortcuts for the Students
-$AllShortcuts = @{
-    "Goodwill Big Bend"   = "https://www.goodwillbigbend.org"
-    "Career Campus"       = "https://www.gwcareercampus.com"
-    "Virtual Campus"      = "https://www.gwvirtualcampus.org"
-    "Essential ED GED"    = "https://app.essentialed.com/start/goodwillbigbend"
-    "Northstar"           = "https://www.digitalliteracyassessment.org"
-    "Satisfaction Survey" = "https://www.surveymonkey.com/r/gwsatisfaction"
-    "Typing.com"          = "https://typing.com"
-    "Office 365 Login"    = "https://www.office.com"
-    "Skills to Succeed"   = "https://s2sacademy.org/login"
-    "Social Security"     = "https://www.ssa.gov"
-    "Learn Free"          = "https://www.learnfree.org/"
-    "GED"                 = "https://www.ged.com/"
-    "Prometric - Secure Browser" = "https://tcnet1.prometric.com/LDBAlternateEntry/index.aspx?ClientNameSingleSite=flcna&LDBredirURL=/EligibilityAlternateEntry/index.aspx"
-
-    # Florida Only:
-    #"Access Florida"      = "https://www.myflorida.com/accessflorida"
-    #"Unemployment"        = "https://floridajobs.org/Reemployment-Assistance-Service-Center/reemployment-assistance/claimants/apply-for-benefits"
-    #"Driver's License"    = "https://www.flhsmv.gov/driver-licenses-id-cards/renew-or-replace-your-florida-driver-license-or-id-card",
-
-    # Georgia Only:
-    "Access Georgia"      = "https://gateway.ga.gov/access/"
-    "Unemployment"        = "https://dol.georgia.gov/individuals/unemployment-benefits"
-    "Driver's License"    = "https://dds.georgia.gov/"
-
-
-    "Job Search Sites" = @{
-        "Indeed"           = "https://www.indeed.com"
-        "Snagajob"         = "https://www.snagajob.com"
-        "Employ Florida"   = "https://www.employflorida.com/vosnet/Default.aspx"
-        "Goodwill Careers" = "https://www.goodwillbigbend.org/careers/"
-        "Simply Hired"     = "https://www.simplyhired.com/"
-        "Zip Recruiter"    = "https://www.ziprecruiter.com/"
-        "Walmart Careers"  = "https://careers.walmart.com/us/en/home"
-    }
-}
-
-
-
-
 
 function Log {                
     param(
@@ -96,8 +31,142 @@ function Log {
     $FormattedMessage | Out-File -FilePath $LogFile -Append -Encoding UTF8
 }
 
+$IPAddress = (Get-NetIPAddress -AddressFamily IPv4 `
+                               -PrefixOrigin Dhcp `
+                               -ErrorAction SilentlyContinue |
+              Where-Object { $_.IPAddress -notlike "169.*" } |      # DHCP not responding?
+              Select-Object -First 1 -ExpandProperty IPAddress)
+
+Log "Detected IP: $IPAddress"
 
 
+# ==========================
+# ======= Configuration =======
+# ===============================
+
+# Log file for silent/remote installs
+$LogFile = Join-Path $env:windir "Temp\LabDFSetupScript.log"
+$DFRemovalScriptName = "DeepFreezeRemoval.ps1"      # < If this script exists nearby and detects and old DF installed it will run to remove it
+                                                    # Useful if we have an old Deep Freeze install that needs removed to install DF Cloud
+
+# Account details for the public user (can be blank password but GPO would need configured)
+$UserName = "Student"
+$Password = "pw"
+
+$ProfileRoot = Join-Path $env:SystemDrive "Users"
+$ProfilePath = Join-Path $ProfileRoot $UserName
+
+$ShortcutDesktop = "$env:PUBLIC\Desktop"        # Path to put desktop shortcuts
+
+# ----------
+
+# TODO: Use your own wallpaper link
+$WallpaperUrl  = "https://goodwillbigbend.org/LabConfig/Career Campus Desktop Wallpaper.png"
+$WallpaperDir  = "$env:PUBLIC\Documents"
+$WallpaperPath = Join-Path $WallpaperDir "Wallpaper.png"
+
+
+$DeepFreezeURL = "" # TODO: Replace this with your Deep Freeze Cloud installer link
+$DeepFreezePath = "$env:PUBLIC\Documents\DeepFreezeInstaller.exe"
+
+$SecureBrowserURL = "https://media.prime.prometric.com/Files/prometric_ldb/PrometricSetup.msi"
+$SecureBrowserPath = "$env:PUBLIC\Documents\SecureBrowser.msi"
+
+
+# Desktop shortcuts for Students (centralized)
+$AllShortcuts = @{
+    "General" = @{
+        "Goodwill Big Bend"   = "https://www.goodwillbigbend.org"
+        "Career Campus"       = "https://www.gwcareercampus.com"
+        "Virtual Campus"      = "https://www.gwvirtualcampus.org"
+        "Essential ED GED"    = "https://app.essentialed.com/start/"
+        "Northstar"           = "https://www.digitalliteracyassessment.org"
+        "Typing.com"          = "https://typing.com"
+        "Office 365 Login"    = "https://www.office.com"
+        "Skills to Succeed"   = "https://s2sacademy.org/login"
+        "Social Security"     = "https://www.ssa.gov"
+        "Learn Free"          = "https://www.learnfree.org/"
+        "GED"                 = "https://www.ged.com/"
+    }
+
+    "JobSearchSites" = @{
+        "Indeed"           = "https://www.indeed.com"
+        "Snagajob"         = "https://www.snagajob.com"
+        "Goodwill Careers" = "https://www.goodwillbigbend.org/careers/"
+        "Simply Hired"     = "https://www.simplyhired.com/"
+        "Zip Recruiter"    = "https://www.ziprecruiter.com"
+    }
+
+    "Locations" = @{
+        "Georgia" = @{
+            "Access Benefits"  = "https://gateway.ga.gov/access/"
+            "Unemployment"     = "https://dol.georgia.gov/individuals/unemployment-benefits"
+            "Driver's License" = "https://dds.georgia.gov/"
+        }
+        "Florida" = @{
+            "Access Benefits"  = "https://www.myflorida.com/accessflorida"
+            "Unemployment"     = "https://floridajobs.org/Reemployment-Assistance-Service-Center/reemployment-assistance/claimants/apply-for-benefits"
+            "Driver's License" = "https://www.flhsmv.gov/driver-licenses-id-cards/renew-or-replace-your-florida-driver-license-or-id-card"
+            "Prometric - Secure Browser" = "https://tcnet.prometric.com/flcna/geelockdown/start.aspx"
+            "JobSearchSites" = @{
+                "Employ Florida" = "https://www.employflorida.com/vosnet/Default.aspx"
+            }
+        }
+        "Springfield" = @{
+            "JobSearchSites" = @{
+                "Parker Job Openings"     = "http://www.cityofparker.com/about-us-employment.aspx"
+                "Bay County Job Openings" = "https://www.baycountyfl.gov/491/Employment-Opportunities"
+                "Callaway Job Openings"   = "https://www.cityofcallaway.com/jobs.aspx"
+                "Lynn Haven Job Openings" = "https://www.cityoflynnhaven.com/Jobs.aspx"
+                "Naf Job Openings"        = "https://www.nafjobs.org/viewjobs.aspx"
+                "PC Job Openings"         = "https://www.pcgov.org/552/Job-Openings"
+            }
+        }
+        "Thomasville" = @{
+            "JobSearchSites" = @{
+                "Walmart Careers" = "https://careers.walmart.com/us/en/home"
+            }
+        }
+    }
+}
+
+
+# Determine Location based on IP
+if ($IPAddress -like "192.168.202*") {
+    $State = "Georgia-Thomasville"     # Georgia area
+} elseif ($IPAddress -like "192.168.3*") {
+    $State = "Florida-Springfield"     # Florida Springfield area
+} else {
+    $State = "Florida"                 # Default to Florida
+}
+
+Log "IP location determined as: $State"
+
+
+# Start with general shortcuts
+$Shortcuts = @{}
+$Shortcuts += $AllShortcuts["General"]
+
+# Merge state-level shortcuts
+if ($State -like "Georgia*") {
+    $Shortcuts += $AllShortcuts["Locations"]["Georgia"]
+} elseif ($State -like "Florida*") {
+    $Shortcuts += $AllShortcuts["Locations"]["Florida"]
+}
+
+# Merge city-specific job sites
+if ($State -like "*Springfield") {
+    $Shortcuts["JobSearchSites"] += $AllShortcuts["Locations"]["Springfield"]["JobSearchSites"]
+} elseif ($State -like "*Thomasville") {
+    $Shortcuts["JobSearchSites"] += $AllShortcuts["Locations"]["Thomasville"]["JobSearchSites"]
+}
+
+
+
+
+# ======================================
+# Deep Freeze Install state check ===
+# =================================
 
 function Get-DeepFreezeState {
 
@@ -166,8 +235,15 @@ function Get-DeepFreezeState {
         return "Frozen"
     }
 
-    # If installed but none of frozen conditions met
-    return "Thawed"
+    # -- Thawed, but is it and old version that needs replaced?
+    $cloudService = Get-Service -Name "FWASvc" -ErrorAction SilentlyContinue
+    if ($cloudService -ne $null -and $cloudService.Status -eq 'Running') {
+        return "Thawed"        # Already running DF Cloud and thawed
+    }
+
+    # Not cloud version installed, so remove/install cloud
+    return "Reinstall"
+
 }
 
 
@@ -175,23 +251,37 @@ $dfState = Get-DeepFreezeState
 
 switch ($dfState) {
 
-    "NotInstalled" {
-        Log "Deep Freeze not installed. Continuing setup." -ForegroundColor Green
+    "Thawed" {
+        Log "Deep Freeze Cloud installed but thawed, configuring install..." -ForegroundColor Green
     }
 
-    "Thawed" {
-        Log "Deep Freeze installed and THAWED. Checking for removal script..." -ForegroundColor Yellow
+    "NotInstalled" {
+        Log "Deep Freeze not installed. Continuing setup..." -ForegroundColor Green
+    }
 
-        $removalScript = Join-Path -Path $PSScriptRoot -ChildPath "DeepFreezeRemoval.ps1"
+    "Reinstall" {
+        Log "Bad Deep Freeze installed and THAWED. Checking for removal script..." -ForegroundColor Yellow
 
-        if (Test-Path $removalScript) {
+        # Initialize variables
+        $ScriptDirectory = $null
+        $removalScript   = $null
 
-            Log "Removal script found. Running..."
+        # Only resolve directory if script file exists
+        if ($PSCommandPath) {
+            $ScriptDirectory = Split-Path -Parent (Resolve-Path $PSCommandPath)
+            $removalScript   = Join-Path $ScriptDirectory $DFRemovalScriptName
+        }
+
+        # Check for removal script
+        if ($removalScript -and (Test-Path $removalScript)) {
+            Log "Removal script found at: $removalScript"
+            Log "Running removal script..."
             & $removalScript
             Log "Removal script completed. Exiting..."
         }
         else {
-            Log "Removal script not found at: $removalScript" -ForegroundColor Red
+            Log "Removal script not found next to the running script." -ForegroundColor Red
+            Log ">> Run the removal script manually, then try install <<" -ForegroundColor Red
         }
 
         Start-Sleep -Seconds 10
@@ -299,9 +389,10 @@ function New-ShortcutTree {
     }
 }
 
-New-ShortcutTree -Tree $AllShortcuts -BasePath $ShortcutDesktop
+New-ShortcutTree -Tree $Shortcuts -BasePath $ShortcutDesktop
 
 Log "Shortcuts created"
+
 
 
 
@@ -428,6 +519,12 @@ Set-ItemProperty -Path $EdgePolicyPath -Name "HideFirstRunExperience" -Value 1 -
 Set-ItemProperty -Path $EdgePolicyPath -Name "BrowserSignin" -Value 0 -Type DWord
 Log "Edge first-run experience disabled."
 
+# Disable News (all users)
+New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Feeds" -Force | Out-Null
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Feeds" -Name "EnableFeeds" -Value 0
+New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Dsh" -Force | Out-Null
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Dsh" -Name "AllowNewsAndInterests" -Value 0
+
 
 
 # -----------------------------
@@ -463,9 +560,67 @@ Set-ItemProperty -Path $PolicyPath -Name "DesktopImageStatus" -Value 1 -Type DWo
 Set-ItemProperty -Path $PolicyPath -Name "LockScreenImageStatus" -Value 1 -Type DWord
 
 
+# ---------------------------------------
+# Download and install Secure Browser
+
+$SecureBrowserInstallPaths = @(
+    "C:\Program Files (x86)\Respondus\LockDown Browser Lab OEM",
+    "C:\Program Files (x86)\Prometric\ProSecureClientLauncher",
+    "C:\Users\Public\Surpass\SecureClient"
+)
+
+$SBInstalled = $false
+
+foreach ($Path in $SecureBrowserInstallPaths) {
+    if (Test-Path $Path) {
+        Write-Host "Found existing installation at: $Path" -ForegroundColor Green
+        $SBInstalled = $true
+        break
+    }
+}
+
+if ($SBInstalled) {
+
+    Log "Secure Browser already installed, skipping..." -ForegroundColor Cyan
+
+} else {
+
+    Log "Downloading and installing Prometric Secure Browser (this will take a while)."
+
+    try {
+        Invoke-WebRequest -Uri $SecureBrowserURL -OutFile $SecureBrowserPath -UseBasicParsing
+    }
+    catch {
+        Log "Failed to download Prometric Secure Browser from $SecureBrowserURL"
+        Start-Sleep -Seconds 10
+        exit 1
+    }
+
+    Start-Process -FilePath $SecureBrowserPath -ArgumentList "/quiet /qn /norestart" -Wait
+
+    $SBDesktopShortcut = "C:\Users\Public\Desktop\LockDown Browser Lab OEM.lnk"
+
+    if (Test-Path $SBDesktopShortcut) {
+        Remove-Item -Path $SBDesktopShortcut -Force
+        Write-Host "Shortcut removed successfully." -ForegroundColor Green
+    } else {
+        Write-Host "Shortcut not found; nothing to delete." -ForegroundColor Yellow
+    }
+
+
+}
+
+
+
 
 # ----------------------------
 # Download Deep Freeze
+
+
+# Already running DF Cloud and thawed, so no need to install it
+If ($dfState -eq "Thawed") {
+    exit 0
+}
 
 try {
     Invoke-WebRequest -Uri $DeepFreezeURL -OutFile $DeepFreezePath -UseBasicParsing
@@ -531,4 +686,3 @@ Register-ScheduledTask `
 Log "Restarting computer to sign in Student then install Deep Freeze" -ForegroundColor Cyan
 Start-Sleep -Seconds 10
 Restart-Computer -Force
-
