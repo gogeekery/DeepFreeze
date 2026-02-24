@@ -669,8 +669,8 @@ catch {
 $WinlogonPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
 
 Set-ItemProperty -Path $WinlogonPath -Name "AutoAdminLogon" -Value "1"
-Set-ItemProperty -Path $WinlogonPath -Name "DefaultUserName" -Value "Student"
-Set-ItemProperty -Path $WinlogonPath -Name "DefaultPassword" -Value "gw"
+Set-ItemProperty -Path $WinlogonPath -Name "DefaultUserName" -Value $UserName
+Set-ItemProperty -Path $WinlogonPath -Name "DefaultPassword" -Value $Password
 
 
 
