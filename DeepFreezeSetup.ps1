@@ -17,6 +17,17 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
     exit 1
 }
 
+
+# ==========================
+# ======= Configuration =======
+# ===============================
+
+# Log file for silent/remote installs
+$LogFile = Join-Path $env:windir "Temp\LabDFSetupScript.log"
+$DFRemovalScriptName = "DeepFreezeRemoval.ps1"      # < If this script exists nearby and detects and old DF installed it will run to remove it
+                                                    # Useful if we have an old Deep Freeze install that needs removed to install DF Cloud
+
+
 function Log {                
     param(
         [Parameter(Mandatory=$true)]
@@ -44,10 +55,6 @@ Log "Detected IP: $IPAddress"
 # ======= Configuration =======
 # ===============================
 
-# Log file for silent/remote installs
-$LogFile = Join-Path $env:windir "Temp\LabDFSetupScript.log"
-$DFRemovalScriptName = "DeepFreezeRemoval.ps1"      # < If this script exists nearby and detects and old DF installed it will run to remove it
-                                                    # Useful if we have an old Deep Freeze install that needs removed to install DF Cloud
 
 # Account details for the public user (can be blank password but GPO would need configured)
 $UserName = "Student"
@@ -129,6 +136,7 @@ $AllShortcuts = @{
         }
     }
 }
+
 
 
 # Determine Location based on IP
@@ -490,11 +498,12 @@ if ($ExistingUser) {
 
 
 # -----------------------------
-# Prevent password from being changed
+# Prevent password from being changed or expiring
 # -----------------------------
 
 net user $UserName /passwordchg:no
 net user $UserName /logonpasswordchg:no
+net user $UserName /expires:never
 
 # Add to Users group
 Add-LocalGroupMember -Group "Users" -Member $UserName
@@ -524,6 +533,27 @@ New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Feeds" -Force 
 Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Feeds" -Name "EnableFeeds" -Value 0
 New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Dsh" -Force | Out-Null
 Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Dsh" -Name "AllowNewsAndInterests" -Value 0
+
+
+# Disable hibernate
+powercfg.exe /hibernate off
+
+# Set sleep timeout to 'Never' for both AC (Plugged In) and DC (Battery)
+powercfg /change standby-timeout-ac 0
+powercfg /change standby-timeout-dc 0
+
+# Set 'unattended sleep' timeout to 0 (prevents sleep after wake-on-lan or updates)
+powercfg /setacvalueindex SCHEME_CURRENT 238c9fa8-0aad-41ed-83f4-97be242c8f20 7bc4a2f9-d8fc-4469-b07b-33eb785aaca0 0
+powercfg /setdcvalueindex SCHEME_CURRENT 238c9fa8-0aad-41ed-83f4-97be242c8f20 7bc4a2f9-d8fc-4469-b07b-33eb785aaca0 0
+
+# Set monitor timeout to 30 minutes
+powercfg /change monitor-timeout-ac 30
+powercfg /change monitor-timeout-dc 30
+
+# Apply the changes
+powercfg /setactive SCHEME_CURRENT
+
+
 
 
 
