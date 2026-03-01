@@ -505,6 +505,8 @@ net user $UserName /passwordchg:no
 net user $UserName /logonpasswordchg:no
 net user $UserName /expires:never
 
+Set-LocalUser -Name $UserName -PasswordNeverExpires $true
+
 # Add to Users group
 Add-LocalGroupMember -Group "Users" -Member $UserName
 
