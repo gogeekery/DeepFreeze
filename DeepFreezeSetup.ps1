@@ -68,7 +68,7 @@ $ShortcutDesktop = "$env:PUBLIC\Desktop"        # Path to put desktop shortcuts
 # ----------
 
 # TODO: Use your own wallpaper link
-$WallpaperUrl  = "https://goodwillbigbend.org/LabConfig/Career Campus Desktop Wallpaper.png"
+$WallpaperUrl  = ""
 $WallpaperDir  = "$env:PUBLIC\Documents"
 $WallpaperPath = Join-Path $WallpaperDir "Wallpaper.png"
 
@@ -103,72 +103,7 @@ $AllShortcuts = @{
         "Simply Hired"     = "https://www.simplyhired.com/"
         "Zip Recruiter"    = "https://www.ziprecruiter.com"
     }
-
-    "Locations" = @{
-        "Georgia" = @{
-            "Access Benefits"  = "https://gateway.ga.gov/access/"
-            "Unemployment"     = "https://dol.georgia.gov/individuals/unemployment-benefits"
-            "Driver's License" = "https://dds.georgia.gov/"
-        }
-        "Florida" = @{
-            "Access Benefits"  = "https://www.myflorida.com/accessflorida"
-            "Unemployment"     = "https://floridajobs.org/Reemployment-Assistance-Service-Center/reemployment-assistance/claimants/apply-for-benefits"
-            "Driver's License" = "https://www.flhsmv.gov/driver-licenses-id-cards/renew-or-replace-your-florida-driver-license-or-id-card"
-            "Prometric - Secure Browser" = "https://tcnet.prometric.com/flcna/geelockdown/start.aspx"
-            "JobSearchSites" = @{
-                "Employ Florida" = "https://www.employflorida.com/vosnet/Default.aspx"
-            }
-        }
-        "Springfield" = @{
-            "JobSearchSites" = @{
-                "Parker Job Openings"     = "http://www.cityofparker.com/about-us-employment.aspx"
-                "Bay County Job Openings" = "https://www.baycountyfl.gov/491/Employment-Opportunities"
-                "Callaway Job Openings"   = "https://www.cityofcallaway.com/jobs.aspx"
-                "Lynn Haven Job Openings" = "https://www.cityoflynnhaven.com/Jobs.aspx"
-                "Naf Job Openings"        = "https://www.nafjobs.org/viewjobs.aspx"
-                "PC Job Openings"         = "https://www.pcgov.org/552/Job-Openings"
-            }
-        }
-        "Thomasville" = @{
-            "JobSearchSites" = @{
-                "Walmart Careers" = "https://careers.walmart.com/us/en/home"
-            }
-        }
-    }
 }
-
-
-
-# Determine Location based on IP
-if ($IPAddress -like "192.168.202*") {
-    $State = "Georgia-Thomasville"     # Georgia area
-} elseif ($IPAddress -like "192.168.3*") {
-    $State = "Florida-Springfield"     # Florida Springfield area
-} else {
-    $State = "Florida"                 # Default to Florida
-}
-
-Log "IP location determined as: $State"
-
-
-# Start with general shortcuts
-$Shortcuts = @{}
-$Shortcuts += $AllShortcuts["General"]
-
-# Merge state-level shortcuts
-if ($State -like "Georgia*") {
-    $Shortcuts += $AllShortcuts["Locations"]["Georgia"]
-} elseif ($State -like "Florida*") {
-    $Shortcuts += $AllShortcuts["Locations"]["Florida"]
-}
-
-# Merge city-specific job sites
-if ($State -like "*Springfield") {
-    $Shortcuts["JobSearchSites"] += $AllShortcuts["Locations"]["Springfield"]["JobSearchSites"]
-} elseif ($State -like "*Thomasville") {
-    $Shortcuts["JobSearchSites"] += $AllShortcuts["Locations"]["Thomasville"]["JobSearchSites"]
-}
-
 
 
 
